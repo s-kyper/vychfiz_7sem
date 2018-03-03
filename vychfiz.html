@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
+<script src="https://rawgit.com/mrdoob/three.js/master/examples/js/controls/TrackballControls.js"></script>
+<style type="text/css">
+    html {
+        background: #F2F2F2;
+    }
+    #pos, #speed {
+        color: black;
+        font-size: 14px;
+    }
+</style>
+<body>
+    <table width="100%">
+        <tr>
+            <td width="30%">
+                <div>
+                    <b>Radius:</b><input type="text" value="10" id="Radius" size="10"><br>
+                    <b>Points count:</b><input type="text" value="20" id="PointCount" size="10"><br>
+                    <b>Point radius:</b><input type="text" value="0.1" id="PointRadius" size="10"><br>
+                    <input type="button" id="btn" value="render!">
+                </div>
+                <div id="pos"></div>
+            </td>
+            <td width="70%">
+                <div id="scene"></div>
+            </td>
+        </tr>
+    </table>
+    <script>
+        document.getElementById("btn").onclick = someFunc;
+        function someFunc() {
+            // variables description
+            var Radius = document.getElementById("Radius").value;
+            var N = document.getElementById("PointCount").value;
+            var pointRadius = document.getElementById("PointRadius").value;
+            var timeout = 0;
+            var points = [];
+
+            // three.js description of render
+            var clock = new THREE.Clock();
+            var scene = new THREE.Scene();
+            var sceneDiv = document.getElementById("scene");
+            var sceneWidth = window.innerWidth * 0.7;
+            var sceneHeight = window.innerHeight;
+            var camera = new THREE.PerspectiveCamera(50, sceneWidth / sceneHeight, 0.1, 50);
+            camera.position.z = 30;
+            var renderer = new THREE.WebGLRenderer({alpha: true});
+            renderer.setSize(sceneWidth, sceneHeight);
+            sceneDiv.appendChild(renderer.domElement);
+            var geometry = new THREE.SphereGeometry(Radius, 20, 20);
+            var wireframeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true, transparent: true });
+            var sphere = new THREE.Mesh(geometry, wireframeMaterial);
+            scene.add(sphere);
+
+            // observers control
+            controls = new THREE.TrackballControls(camera);
+            controls.rotateSpeed = 1.0;
+            controls.zoomSpeed = 1.2;
+            controls.panSpeed = 0.3;
+            controls.noRotate = false;
+            controls.noZoom = false;
+            controls.noPan = true;
+            controls.staticMoving = false;
+            controls.dynamicDampingFactor = 0.2;
+
+            // render init + points init
+            for (i = 0; i < N; i++) {
+                var geometry = new THREE.SphereGeometry(pointRadius, 4, 4);
+                var wireframeMaterial = new THREE.MeshBasicMaterial({
+                    color: Math.floor(Math.random() * 16777215),
+                    wireframe: false,
+                    transparent: false
+                });
+                var pointG = new THREE.Mesh(geometry, wireframeMaterial);
+                var point = new THREE.Vector3(random(-Radius/2, Radius/2),
+                                            random(-Radius/2, Radius/2),
+                                            random(-Radius/2, Radius/2));
+                points.push(point);
+
+                pointG.isPoint__ = true;
+                scene.add(pointG);
+                pointG.position.copy(point);
+
+                // print coordinates
+                var div = document.createElement('div');
+                div.id = 'pos-' + i;
+                div.innerHTML = i + " :";
+                document.getElementById('pos').appendChild(div);
+            }
+
+            var render = () => {
+                requestAnimationFrame(render);
+                controls.update();
+
+                timeout += clock.getDelta();
+                if (timeout > 0.1) {
+                    calc();
+                    flag = 0;
+                    for (var i = 0; i < scene.children.length; i++) {
+                        var object = scene.children[i];
+                        if (object.isPoint__ !== undefined) {
+                            if (flag === 0) {
+                                flag = 1;
+                                u = i;
+                            }
+                            object.position.copy(points[i - u]);
+                        }
+                    }
+                    timeout = 0;
+                }
+                renderer.render(scene, camera);
+            }
+
+            render();
+
+            // helpful functions
+            function calc() {
+                var startEnergy;
+                for (var i = 0; i < N; i++) {
+                    startEnergy = 0;
+                    for (var j = 0; j < N; j++) {
+                        if (i !== j) {
+                            r = points[i].distanceTo(points[j]);
+                            var energy = 1 / r;
+                            startEnergy = startEnergy + energy;
+                        }
+                    }
+
+                    var newPoint;
+                    do {
+                        var e = new THREE.Vector3(random(-0.1, 0.1), random(-0.1, 0.1), random(-0.1, 0.1));
+                        newPoint = add(points[i], e);
+                        var len = newPoint.length();
+                    } while (len >= Radius && points[i].length() < Radius);
+
+                    var newEnergy = 0;
+                    for (var j = 0; j < N; j++) {
+                        if (i !== j) {
+                            r = newPoint.distanceTo(points[j]);
+                            var energy = 1 / r;
+                            newEnergy = newEnergy + energy;
+                        }
+                    }
+
+                    if (startEnergy - newEnergy > 0.0001) points[i].add(e);
+
+                    // print coordinates
+                    var div = document.getElementById("pos-" + i);
+                    div.innerHTML = i + " : x=" + points[i].x.toFixed(3) +
+                                        ", y = " + points[i].y.toFixed(3) +
+                                        ", z = " + points[i].z.toFixed(3);
+                }
+            }
+
+            function random(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            function add(f, s) {
+                return new THREE.Vector3(f.x + s.x, f.y + s.y, f.z + s.z);
+            }
+        }
+    </script>
+</body>
